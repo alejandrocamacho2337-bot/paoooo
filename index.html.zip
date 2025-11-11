@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Para mi Paola ❤️</title>
+    <!-- Carga de Tailwind CSS para el estilo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Tone.js para la música -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        /* Estilo base para centrar el juego */
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #fce7f3; /* Rosa claro de fondo */
+            overflow: hidden;
+            touch-action: manipulation; /* Mejor manejo táctil en móviles */
+        }
+
+        /* Estilo para el Canvas del juego */
+        #gameCanvas {
+            box-shadow: 0 10px 30px rgba(255, 0, 102, 0.4);
+            border-radius: 12px;
+            background-color: #2d3748; /* Oscuro para el contraste */
+        }
+
+        /* Animación de Corazones (Emojis) */
+        .heart-emoji-piece {
+            position: absolute;
+            font-size: 20px; /* Tamaño del emoji de corazón */
+            opacity: 0;
+            user-select: none;
+            pointer-events: none;
+            animation: fall-heart 5s linear infinite;
+        }
+
+        @keyframes fall-heart {
+            0% { transform: translate(var(--x), var(--y)) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--x-end), 100vh) rotate(720deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="flex flex-col items-center justify-center p-4 max-w-lg w-full">
+
+    <!-- Pantalla Inicial / Contenedor Principal -->
+    <div id="introScreen" class="text-center transition-opacity duration-500 cursor-pointer p-8 rounded-xl bg-white shadow-xl hover:shadow-2xl hover:scale-[1.02]">
+        <h1 class="text-5xl font-extrabold text-pink-600 mb-4 tracking-tighter">
+            Te amo Pao ❤️
+        </h1>
+        <p class="text-gray-600 text-lg">Haz clic o toca para iniciar un pequeño juego.</p>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mx-auto mt-4 text-pink-500 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13l-3 3m0 0l-3-3m3 3V8m0 16a12 12 0 110-24 12 12 0 010 24z" />
+        </svg>
+    </div>
+
+    <!-- Contenedor del Juego -->
+    <div id="gameContainer" class="hidden flex-col items-center">
+        <!-- Mensaje de objetivo actualizado (sin el número de puntos) -->
+        <h2 class="text-xl font-extrabold text-pink-600 mb-4 text-center">
+            Completa los puntos necesarios para desbloquear algo importante
+        </h2>
+        
+        <div class="flex justify-between w-full mb-2 px-2">
+            <p class="text-lg font-bold text-gray-700">Puntuación: <span id="scoreDisplay" class="text-pink-600">0</span></p>
+            <p id="statusMessage" class="text-lg font-bold text-red-500"></p>
+        </div>
+        <canvas id="gameCanvas" width="400" height="400" class="border-4 border-pink-500 rounded-xl"></canvas>
+        
+        <!-- Controles Táctiles (para móvil) -->
+        <div id="touchControls" class="grid grid-cols-3 gap-2 mt-6 w-full max-w-xs">
+            <div></div>
+            <button data-dir="up" class="control-btn bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 rounded-lg shadow-md">▲</button>
+            <div></div>
+            <button data-dir="left" class="control-btn bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 rounded-lg shadow-md">◀</button>
+            <button id="restartButton" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 rounded-lg shadow-md hidden">Reintentar</button>
+            <button data-dir="right" class="control-btn bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 rounded-lg shadow-md">▶</button>
+            <div></div>
+            <button data-dir="down" class="control-btn bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 rounded-lg shadow-md">▼</button>
+            <div></div>
+        </div>
+    </div>
+    
+    <!-- Modal de Victoria (Oculto por defecto) -->
+    <div id="winModal" class="fixed inset-0 bg-pink-200 bg-opacity-95 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden transition-opacity duration-1000">
+        <div class="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-md w-full text-center border-4 border-pink-500 transform scale-0 opacity-0 transition-all duration-700" id="modalContent">
+            <h2 class="text-6xl font-extrabold text-pink-700 mb-6 animate-pulse">¡Ganaste! 💖</h2>
+            <p class="text-xl text-gray-800 font-medium leading-relaxed mb-8">
+                Te amo mucho, Paola.
+                <br><br>
+                Si fuera por mí, estaría contigo en este momento, porque no hay nada que desee más que tenerte cerca. Pero la distancia es algo que no puedo cambiar, por más que lo intente.
+                <br><br>
+                Solo quiero que seas feliz, que disfrutes tu vida en la prepa y que sigas cumpliendo tus sueños. Mientras tanto, yo estaré aquí, esperándote con paciencia y amor, porque lo único que deseo es compartir cada instante de mi vida contigo…hasta que la muerte nos separe.❤️
+            </p>
+            
+            <!-- Nuevos botones de Sí/No -->
+            <p class="text-2xl font-bold text-gray-700 mb-4">¿Aceptas?</p>
+            <div class="flex justify-center space-x-4">
+                <button id="acceptButton" onclick="handleAccept()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 transform hover:scale-105">
+                    Sí
+                </button>
+                <button id="declineButton" onclick="handleDecline()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 transform hover:scale-105">
+                    No
+                </button>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- Mensaje de Reintento (Oculto por defecto) -->
+    <div id="retryMessage" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-500">
+        <h1 class="text-8xl font-extrabold text-yellow-400 animate-pulse">¡VAMOS DE NUEVO!</h1>
+    </div>
+
+</div>
+
+<script>
+    // Variables globales
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const gridSize = 20; // Tamaño de la cuadrícula
+    const tileCount = canvas.width / gridSize;
+    const WIN_SCORE = 10; // Puntuación requerida para ganar (Ahora son 10 puntos)
+    
+    // Estado del juego
+    let snake = [];
+    let food = { x: 0, y: 0 };
+    let velocity = { x: 1, y: 0 }; // Dirección inicial (derecha)
+    let nextVelocity = { x: 1, y: 0 }; // Para evitar giros en 180 grados
+    let score = 0;
+    let gameLoopInterval = 100; // Velocidad del juego (en ms)
+    let lastTime = 0;
+    let isPlaying = false;
+    let isGameOver = false;
+
+    // Elementos del DOM
+    const introScreen = document.getElementById('introScreen');
+    const gameContainer = document.getElementById('gameContainer');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const statusMessage = document.getElementById('statusMessage');
+    const restartButton = document.getElementById('restartButton');
+    const winModal = document.getElementById('winModal');
+    const modalContent = document.getElementById('modalContent');
+    const touchControls = document.getElementById('touchControls');
+    const retryMessage = document.getElementById('retryMessage'); // Nuevo elemento
+    // Nota: Eliminamos la referencia al span requiredScore ya que ya no existe en el HTML.
+
+    // --- Funciones de Inicialización ---
+
+    // Configuración inicial del juego
+    function resetGame() {
+        // Posición inicial de la serpiente
+        snake = [
+            { x: 10, y: 10 },
+            { x: 9, y: 10 },
+            { x: 8, y: 10 }
+        ];
+        velocity = { x: 1, y: 0 };
+        nextVelocity = { x: 1, y: 0 };
+        score = 0;
+        isGameOver = false;
+        isPlaying = true;
+        scoreDisplay.textContent = score;
+        statusMessage.textContent = '';
+        restartButton.classList.add('hidden');
+        spawnFood();
+
+        // INICIA EL BUCLE DEL JUEGO DESPUÉS DE REINICIAR EL ESTADO
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Coloca la comida en una posición aleatoria que no sea la serpiente
+    function spawnFood() {
+        let newFood;
+        do {
+            newFood = {
+                x: Math.floor(Math.random() * tileCount),
+                y: Math.floor(Math.random() * tileCount)
+            };
+        } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+        food = newFood;
+    }
+
+    // Inicia el juego y la animación
+    function startGame() {
+        if (!isPlaying) {
+            introScreen.classList.add('opacity-0');
+            setTimeout(() => {
+                introScreen.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                // Llamamos a resetGame, que ahora también inicia el loop
+                resetGame(); 
+            }, 500);
+        }
+    }
+
+    // --- Lógica del Juego ---
+
+    function gameLoop(timestamp) {
+        if (!isPlaying) return;
+
+        if (timestamp - lastTime < gameLoopInterval) {
+            requestAnimationFrame(gameLoop);
+            return;
+        }
+        lastTime = timestamp;
+
+        // Aplica la dirección de la próxima velocidad
+        velocity = nextVelocity;
+
+        // Mueve la cabeza de la serpiente
+        const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
+
+        // 1. Colisión con Paredes (Game Over)
+        if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+            gameOver();
+            return;
+        }
+
+        // 2. Colisión consigo misma (Game Over)
+        if (snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y)) {
+            gameOver();
+            return;
+        }
+
+        // Inserta la nueva cabeza al inicio del array
+        snake.unshift(head);
+
+        // 3. Colisión con Comida
+        if (head.x === food.x && head.y === food.y) {
+            score++;
+            scoreDisplay.textContent = score;
+            spawnFood();
+            
+            // Revisa Condición de Victoria
+            if (score >= WIN_SCORE) {
+                winGame();
+                return;
+            }
+        } else {
+            // Si no come, quita el último segmento (la serpiente se mueve)
+            snake.pop();
+        }
+
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // --- Funciones de Dibujo ---
+
+    function draw() {
+        // Limpia el canvas (fondo)
+        ctx.fillStyle = '#2d3748';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Dibuja la Comida (un corazón)
+        ctx.fillStyle = '#f97316'; // Naranja para la comida
+        ctx.beginPath();
+        const foodX = food.x * gridSize + gridSize / 2;
+        const foodY = food.y * gridSize + gridSize / 2;
+        const heartSize = gridSize * 0.4;
+        
+        ctx.moveTo(foodX, foodY + heartSize);
+        ctx.bezierCurveTo(foodX + heartSize, foodY - heartSize * 0.5, foodX + heartSize, foodY - heartSize * 1.5, foodX, foodY - heartSize * 2);
+        ctx.bezierCurveTo(foodX - heartSize, foodY - heartSize * 1.5, foodX - heartSize, foodY - heartSize * 0.5, foodX, foodY + heartSize);
+        ctx.fill();
+
+        // Dibuja la Serpiente
+        snake.forEach((segment, index) => {
+            if (index === 0) {
+                // Cabeza
+                ctx.fillStyle = '#ec4899'; // Rosa fuerte
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
+            } else {
+                // Cuerpo
+                ctx.fillStyle = '#f472b6'; // Rosa más suave
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize - 1, gridSize - 1);
+            }
+        });
+    }
+
+    // --- Funciones de Eventos ---
+
+    // Maneja la entrada del teclado para cambiar la dirección
+    function handleKeyDown(event) {
+        if (!isPlaying || isGameOver) return;
+
+        let newDir = { x: velocity.x, y: velocity.y };
+
+        switch (event.key) {
+            case 'ArrowUp':
+            case 'w':
+                if (velocity.y === 0) newDir = { x: 0, y: -1 };
+                break;
+            case 'ArrowDown':
+            case 's':
+                if (velocity.y === 0) newDir = { x: 0, y: 1 };
+                break;
+            case 'ArrowLeft':
+            case 'a':
+                if (velocity.x === 0) newDir = { x: -1, y: 0 };
+                break;
+            case 'ArrowRight':
+            case 'd':
+                if (velocity.x === 0) newDir = { x: 1, y: 0 };
+                break;
+        }
+
+        // Solo actualiza si no es un giro de 180 grados
+        if (newDir.x + velocity.x !== 0 || newDir.y + velocity.y !== 0) {
+            nextVelocity = newDir;
+        }
+    }
+
+    // Maneja los clics en los botones de control táctil
+    touchControls.querySelectorAll('.control-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const dir = e.currentTarget.getAttribute('data-dir');
+            if (!isPlaying || isGameOver) return;
+            
+            let newDir = { x: velocity.x, y: velocity.y };
+
+            switch (dir) {
+                case 'up':
+                    if (velocity.y === 0) newDir = { x: 0, y: -1 };
+                    break;
+                case 'down':
+                    if (velocity.y === 0) newDir = { x: 0, y: 1 };
+                    break;
+                case 'left':
+                    if (velocity.x === 0) newDir = { x: -1, y: 0 };
+                    break;
+                case 'right':
+                    if (velocity.x === 0) newDir = { x: 1, y: 0 };
+                    break;
+            }
+            
+            if (newDir.x + velocity.x !== 0 || newDir.y + velocity.y !== 0) {
+                nextVelocity = newDir;
+            }
+        });
+    });
+
+    // --- Funciones de Estado y Música ---
+
+    function gameOver() {
+        isPlaying = false;
+        isGameOver = true;
+        statusMessage.textContent = '¡Fin del juego! Inténtalo de nuevo.';
+        restartButton.classList.remove('hidden');
+        draw(); // Último dibujo para mostrar la posición final
+    }
+
+    // Genera y anima los emojis de corazón
+    function startConfetti() {
+        // Usamos el emoji de corazón ❤️
+        const heartEmoji = '❤️'; 
+        const confettiCount = 200; // Aumentado a 200 para cobertura total
+        
+        for (let i = 0; i < confettiCount; i++) {
+            const piece = document.createElement('span');
+            piece.textContent = heartEmoji;
+            piece.classList.add('heart-emoji-piece');
+            
+            // Valores aleatorios para la posición y animación
+            const xStart = Math.random() * window.innerWidth;
+            const xEnd = Math.random() * window.innerWidth;
+            const yStart = -50 - Math.random() * 200;
+
+            piece.style.setProperty('--x', `${xStart}px`);
+            piece.style.setProperty('--y', `${yStart}px`);
+            piece.style.setProperty('--x-end', `${xEnd}px`);
+            piece.style.animationDelay = `${-Math.random() * 5}s`;
+            piece.style.animationDuration = `${4 + Math.random() * 3}s`;
+
+            document.body.appendChild(piece);
+        }
+        // Limpia los corazones después de 5 segundos
+        setTimeout(() => {
+            document.querySelectorAll('.heart-emoji-piece').forEach(p => p.remove());
+        }, 5000); 
+    }
+
+    // Condición de Victoria
+    function winGame() {
+        isPlaying = false;
+        isGameOver = true;
+        
+        // 1. Muestra el mensaje de victoria
+        winModal.classList.remove('hidden');
+        // Prepara la animación de entrada
+        modalContent.classList.add('scale-0', 'opacity-0'); 
+        setTimeout(() => {
+            modalContent.classList.remove('scale-0', 'opacity-0');
+        }, 10);
+    }
+
+    // Acción al presionar "Sí" (Emojis de Corazones + Volver a Pantalla Principal)
+    function handleAccept() {
+        // 1. Ocultar modal de victoria
+        winModal.classList.add('hidden');
+
+        // 2. Llenar la pantalla de corazones (emojis).
+        startConfetti();
+        
+        // 3. Detener el juego, ocultar el contenedor del juego y mostrar la pantalla principal (introScreen)
+        isPlaying = false; // Detiene el bucle del juego
+        gameContainer.classList.add('hidden'); // Oculta el juego
+        // Muestra la intro screen, eliminando la clase 'hidden' y restaurando la opacidad
+        introScreen.classList.remove('hidden', 'opacity-0'); 
+    }
+
+    // Acción al presionar "No"
+    function handleDecline() {
+        // 1. Esconder modal
+        winModal.classList.add('hidden');
+
+        // 2. Mostrar mensaje de "Vamos de nuevo"
+        retryMessage.classList.remove('hidden');
+        setTimeout(() => {
+            retryMessage.classList.remove('opacity-0');
+        }, 10);
+
+        // 3. Reiniciar el juego y esconder el mensaje después de un tiempo
+        setTimeout(() => {
+            retryMessage.classList.add('opacity-0');
+            // Espera la transición de opacidad antes de reiniciar
+            setTimeout(() => {
+                retryMessage.classList.add('hidden');
+                resetGame();
+            }, 500); 
+        }, 1500); // Muestra el mensaje por 1.5 segundos
+    }
+
+
+    // --- Listeners ---
+    document.addEventListener('keydown', handleKeyDown);
+    introScreen.addEventListener('click', startGame);
+    // Este listener llama a la función resetGame()
+    restartButton.addEventListener('click', resetGame);
+    
+    // Inicialización del juego al cargar la ventana
+    window.onload = function() {
+        draw(); // Dibuja el canvas vacío o la serpiente inicial
+    };
+
+    // Para evitar que Tone.js falle al inicio, lo iniciamos en el primer click.
+    document.documentElement.addEventListener('mousedown', () => {
+        // Esta función de música ya no se usa, pero es bueno mantener el inicio de audio context
+        if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+            Tone.start();
+        }
+    });
+
+</script>
+
+</body>
+</html>
